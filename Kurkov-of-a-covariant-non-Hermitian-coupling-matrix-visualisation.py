@@ -3,12 +3,11 @@
 """
 ================================================================================
 ФЁДОРОВ–ХОПФ: КАУЗАЛЬНАЯ СИМУЛЯЦИЯ И СОХРАНЕНИЕ МЕТРИКИ КРЕЙНА
-Академический расчетный комплекс с выводом физического паспорта
+100% АВТОНОМНЫЙ КОМПЛЕКС: ДИНАМИЧЕСКИЙ РАСЧЕТ ρ БЕЗ ПРЕДЗАПИСАННЫХ СТРОК
 ================================================================================
 """
 
 import sys
-import time
 import numpy as np
 import mpmath as mp
 import sympy as sp
@@ -20,15 +19,12 @@ import matplotlib.pyplot as plt
 # ==============================================================================
 
 def get_user_params():
-    """Чтение параметров матрицы N и времени T из консоли или аргументов."""
     default_N = 32
     default_T = 40.0
 
     if len(sys.argv) >= 3:
         try:
-            n_val = int(sys.argv[1])
-            t_val = float(sys.argv[2])
-            return n_val, t_val
+            return max(4, int(sys.argv[1])), max(1.0, float(sys.argv[2]))
         except ValueError:
             pass
 
@@ -52,15 +48,62 @@ def get_user_params():
 N_SPINS, MAX_TIME = get_user_params()
 
 # ==============================================================================
-# 2. РАСЧЕТ И ВЫВОД ФУНДАМЕНТАЛЬНЫХ КОНСТАНТ
+# 2. ГЕНЕРАЦИЯ ПРОСТЫХ ЧИСЕЛ И ДИНАМИЧЕСКИЙ РАСЧЕТ ρ
 # ==============================================================================
 
-RHO_STR = '3.523019107092335542748196400366218388934326396843662720745233990171677478324985987702197964937828374'
 needed_n = 2 * N_SPINS
 dps_calc = int(0.5618 * needed_n) + 80
 mp.mp.dps = dps_calc
 
-rho = mp.mpf(RHO_STR)
+def get_true_primes(count):
+    return list(sp.primerange(2, sp.prime(count) + 1))
+
+def compute_c_moments(primes):
+    M = len(primes)
+    c = [0] * (M + 1)
+    c[1] = int(primes[0])
+    for n in range(2, M + 1):
+        s = sum(int(primes[k - 1]) * c[n - k] for k in range(1, n))
+        c[n] = int(primes[n - 1]) + s
+    return c
+
+print("\n[*] Шаг 1: Извлечение базисных простых квантов...")
+primes = get_true_primes(needed_n)
+
+def compute_dynamic_rho(primes_list, dps):
+    """
+    Динамический расчет спектрального масштаба ρ методом Ньютона
+    из фундаментального тождества спектральной нормировки:
+    f(ρ) = sum_{n=1}^{M} (p_n / ρ^n) - 1 = 0
+    """
+    mp.mp.dps = dps
+    M = len(primes_list)
+    p_mp = [mp.mpf(x) for x in primes_list]
+    
+    # Начальное приближение
+    rho_cur = mp.mpf('3.5')
+    
+    for _ in range(100):
+        f_val = mp.mpf(-1)
+        f_prime = mp.mpf(0)
+        rho_pow = mp.mpf(1)
+        for n in range(1, M + 1):
+            rho_pow *= rho_cur
+            term = p_mp[n - 1] / rho_pow
+            f_val += term
+            f_prime -= mp.mpf(n) * term / rho_cur
+            
+        step = f_val / f_prime
+        rho_cur -= step
+        if abs(step) < mp.mpf(10)**(-dps + 5):
+            break
+            
+    return rho_cur
+
+print(f"[*] Шаг 2: Динамический расчет спектрального корня ρ из {needed_n} простых чисел...")
+rho = compute_dynamic_rho(primes, dps_calc)
+
+# Расчет геометрических инвариантов Хопфа и эллиптических параметров
 Z_rho = (1 - rho**2) / (1 + rho**2)
 k2 = 1 / rho
 K_ell = mp.ellipk(k2)
@@ -76,9 +119,9 @@ kappa_1 = kappa_0 * mp.mpf(5) / 9
 c_eff = 1.5
 
 print("\n" + "=" * 80)
-print("             ПАСПОРТ ФУНДАМЕНТАЛЬНЫХ КОНСТАНТ СИСТЕМЫ")
+print("             ПАСПОРТ ФУНДАМЕНТАЛЬНЫХ КОНСТАНТ СИСТЕМЫ (ДИНАМИЧЕСКИЙ)")
 print("=" * 80)
-print(f"  • Спектральный масштаб (ρ):        {mp.nstr(rho, 25)}")
+print(f"  • Спектральный масштаб (ρ):        {mp.nstr(rho, 25)}  [ВЫЧИСЛЕНО НА ЛЕТУ]")
 print(f"  • Параллель тора Клиффорда (Z_ρ):  {float(Z_rho):.10f}")
 print(f"  • Модулярный параметр Якоби (q):   {float(q_mod):.6e}")
 print(f"  • Функция замыкания Стилтьеса (S₂): {float(S2):.10f}")
@@ -94,19 +137,6 @@ print("=" * 80)
 # 3. ПОСТРОЕНИЕ ОПЕРАТОРА J_N И КРЕЙН-СИГНАТУРЫ
 # ==============================================================================
 
-def get_true_primes(count):
-    return list(sp.primerange(2, sp.prime(count) + 1))
-
-def compute_c_moments(primes):
-    M = len(primes)
-    c = [0] * (M + 1)
-    c[1] = int(primes[0])
-    for n in range(2, M + 1):
-        s = sum(int(primes[k - 1]) * c[n - k] for k in range(1, n))
-        c[n] = int(primes[n - 1]) + s
-    return c
-
-primes = get_true_primes(needed_n)
 c_int = compute_c_moments(primes)
 moments = [mp.mpf(1)] + [mp.mpf(c_int[i]) / (rho**i) for i in range(1, needed_n + 1)]
 
@@ -184,7 +214,6 @@ print("=" * 80)
 print(f" {'Шаг':>5} | {'Время t':>8} | {'Евклид. норма ||Ψ||²':>22} | {'Крейн-норма <Ψ|η|Ψ>':>20} | {'Ведущий уровень k_max':>21}")
 print(" " + "─" * 84)
 
-# Определяем 20 контрольных точек времени для вывода в консоль
 print_interval = max(1, TIME_STEPS // 20)
 
 for t_idx, t in enumerate(time_grid):
@@ -219,7 +248,6 @@ im = ax1.imshow(density_matrix, aspect='auto', origin='lower', cmap='inferno',
 ax1.set_title(r'$|\Psi_k(t)|^2 = \left| \langle k | \exp(-i \hat{J}_N t) | 0 \rangle \right|^2$', fontsize=15, pad=12)
 ax1.set_ylabel('Спиновые гармоники $k$', fontsize=11)
 
-# Световой конус Либа–Робинсона
 ax1.plot(time_grid, np.clip(c_eff * time_grid, 0, N_SPINS - 1), color='cyan', linestyle='--', linewidth=1.8, 
          label=rf'Конус Либа--Робинсона ($c_{{\mathrm{{eff}}}} = {c_eff}$)')
 ax1.legend(loc='upper left', fontsize=10, framealpha=0.3)
@@ -245,12 +273,11 @@ for s in ax2.spines.values():
 
 plt.tight_layout()
 
-# Сохранение и интерактивный показ
 output_img = 'causal_cone.png'
 plt.savefig(output_img, bbox_inches='tight', dpi=300, facecolor=fig.get_facecolor())
 print(f"[✓] График сохранен в файл: {output_img}")
 print("[*] Открытие графического окна...")
 plt.show()
 print("=" * 80)
-print("  РАСЧЕТ И СИМУЛЯЦИЯ ПОЛНОСТЬЮ ЗАВЕРШЕНЫ")
+print("  РАСЧЕТ И СИМУЛЯЦИЯ ПОЛНОСТЬЮ ЗАВЕРШЕНЫ (100% ДИНАМИЧЕСКИЙ РЕЖИМ)")
 print("=" * 80)
