@@ -1,7 +1,7 @@
 # Causal Wave Kinematics in the "Vacuum of Prime Numbers"
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Status: Academic Preprint](https://img.shields.io/badge/Status-Academic_Preprint-success.svg)](#)
-[![License: Copyright M.A. Kurkov](https://img.shields.io/badge/License-Copyright-red.svg)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
@@ -24,7 +24,7 @@ The script performs a "bottom-up" synthesis of the pseudo-Hermitian Hamiltonian 
    Scaling moments using the fundamental invariant of the Hopf torus $\rho \approx 3.523...$:
    $$m_n = c_n / \rho^n$$
 3. **Stieltjes-Krein Inversion:** 
-   Solving the inverse generalized Chebyshev-Markov problem to build a complex tridiagonal Jacobi matrix $J_N$, where off-diagonal squared elements $b_k^2$ naturally acquire negative values (implying imaginary coupling constants and defining a non-Hermitian Krein space).
+   Solving the inverse generalized Chebyshev-Markov problem to build a complex tridiagonal Jacobi matrix $J_N$. Because of the alternating sign of the Hankel determinants for higher harmonics, the squared off-diagonal elements $b_k^2$ naturally acquire negative values. This implies imaginary coupling constants and rigorously defines a non-Hermitian Krein space.
 
 ## Physical Simulation & Key Discoveries
 
@@ -37,6 +37,11 @@ $$ i\partial_t |\Psi(t)\rangle = \hat{J}_N |\Psi(t)\rangle, \quad |\Psi(0)\rangl
 3. **$\mathcal{PT}$-Symmetry Breaking:** Driven by the imaginary cross-couplings of the Krein metric, the system undergoes a spontaneous $\mathcal{PT}$-symmetry breaking transition at higher modes, visualized as a macroscopic exponential pulsation of the Euclidean state norm.
 
 ## Installation and Requirements
+
+To run the simulation, you need Python 3.8+ and standard scientific computing libraries:
+
+```bash
+pip install numpy scipy matplotlib sympy mpmath
 
 To run the simulation, you need Python 3.8+ and standard scientific computing libraries:
 
